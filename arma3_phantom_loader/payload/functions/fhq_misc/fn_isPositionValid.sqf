@@ -1,0 +1,1 @@
+(if (param [0] == 0 and param[1] == 0 and param[2, 0] == 0) then {false} else {true})

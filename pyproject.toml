@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arma3-phantom-mission-loader"
+version = "2.0.0"
+description = "Cross-platform Arma 3 mission loader: configures mission.sqm and generates description.ext, init.sqf, briefing/debriefing scripts and the FHQ functions payload."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Benn Pham" }]
+dependencies = ["PySide6>=6.5"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.gui-scripts]
+arma3-phantom-loader = "arma3_phantom_loader.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["arma3_phantom_loader*"]
+
+[tool.setuptools.package-data]
+arma3_phantom_loader = ["payload/**/*"]
