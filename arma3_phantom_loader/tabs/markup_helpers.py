@@ -4,10 +4,13 @@ helper buttons."""
 from __future__ import annotations
 
 import re
+from typing import List
 
 from PySide6.QtWidgets import (QColorDialog, QGridLayout, QGroupBox,
                                QLineEdit, QMessageBox, QPlainTextEdit,
                                QPushButton)
+
+from .marker_combo import make_marker_combo, set_marker_items
 
 HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
@@ -31,8 +34,7 @@ class MarkupHelperBox(QGroupBox):
         self.text_input.setPlaceholderText("Text to insert")
         self.color_input = QLineEdit()
         self.color_input.setPlaceholderText("#FF0000")
-        self.marker_input = QLineEdit()
-        self.marker_input.setPlaceholderText("Marker name")
+        self.marker_input = make_marker_combo("Marker name")
 
         pick_button = QPushButton("Pick color…")
         pick_button.clicked.connect(self._pick_color)
@@ -74,8 +76,11 @@ class MarkupHelperBox(QGroupBox):
             return False
         return True
 
+    def set_markers(self, names: List[str]) -> None:
+        set_marker_items(self.marker_input, names)
+
     def _valid_marker(self) -> bool:
-        marker = self.marker_input.text()
+        marker = self.marker_input.currentText()
         if "'" in marker or '"' in marker:
             QMessageBox.critical(
                 self, "Quotes not Allowed",
@@ -96,11 +101,11 @@ class MarkupHelperBox(QGroupBox):
     def _insert_link_default(self) -> None:
         if self._valid_marker():
             self._append("<font color='\" + _htmlcolor + \"'>"
-                         f"<marker name='{self.marker_input.text()}'>"
+                         f"<marker name='{self.marker_input.currentText()}'>"
                          + _esc(self.text_input.text()) + "</marker></font>")
 
     def _insert_link_custom(self) -> None:
         if self._valid_color() and self._valid_marker():
             self._append(f"<font color='{self.color_input.text()}'>"
-                         f"<marker name='{self.marker_input.text()}'>"
+                         f"<marker name='{self.marker_input.currentText()}'>"
                          + _esc(self.text_input.text()) + "</marker></font>")
