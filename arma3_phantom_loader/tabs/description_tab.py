@@ -29,8 +29,10 @@ class DescriptionTab(QWidget):
         init_layout = QVBoxLayout(init_box)
         self.init_ace = QCheckBox(
             "Init ACE Extra — add extra ACE equipment block (fill in the TODO)")
+        self.init_ace.setChecked(True)
         self.init_zeus = QCheckBox(
             "Init Zeus — make all editor-placed units controllable by zeus_mod1-3")
+        self.init_zeus.setChecked(True)
         init_layout.addWidget(self.init_ace)
         init_layout.addWidget(self.init_zeus)
         layout.addWidget(init_box)
