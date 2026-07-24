@@ -54,25 +54,6 @@ def write_init_sqf(mission_dir: str, config: MissionConfig) -> Path:
         if config.taw_vd.enable_max_range:
             lines.append(f"tawvd_maxRange = {config.taw_vd.max_range};")
 
-    if desc.params_scale_players:
-        lines += [
-            "",
-            "// Singleplayer handling",
-            "if (!isMultiplayer) then {",
-            "\t// TODO",
-            "};",
-            "",
-            "// Scaled Multiplayer handling for small player count",
-            '_ScalePlayers = "ScalePlayers" call BIS_fnc_getParamValue;',
-            "if (_ScalePlayers == 1 && isServer && isMultiplayer) then {",
-            "\t// TODO",
-            "};",
-            "",
-            "// Fullhouse Multiplayer Handling",
-            "if (_ScalePlayers == 0 && isServer && isMultiplayer) then {",
-            "\t// TODO",
-            "};",
-        ]
     if desc.init_ace:
         lines += [
             "",
@@ -99,6 +80,25 @@ def write_init_sqf(mission_dir: str, config: MissionConfig) -> Path:
             "",
             "\t\t// TODO",
             "\t} forEach FHQ_playableUnits;",
+            "};",
+        ]
+    if desc.params_scale_players:
+        lines += [
+            "",
+            "// Singleplayer handling",
+            "if (!isMultiplayer) then {",
+            "\t// TODO",
+            "};",
+            "",
+            "// Scaled Multiplayer handling for small player count",
+            '_ScalePlayers = "ScalePlayers" call BIS_fnc_getParamValue;',
+            "if (_ScalePlayers == 1 && isServer && isMultiplayer) then {",
+            "\t// TODO",
+            "};",
+            "",
+            "// Fullhouse Multiplayer Handling",
+            "if (_ScalePlayers == 0 && isServer && isMultiplayer) then {",
+            "\t// TODO",
             "};",
         ]
     if desc.init_zeus:
