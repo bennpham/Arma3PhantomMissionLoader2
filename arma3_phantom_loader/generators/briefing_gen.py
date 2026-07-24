@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List
 
-from ..model import BriefingEntry, MissionConfig, TaskEntry
+from ..model import BriefingEntry, MissionConfig, TaskEntry, ordered_tasks
 
 FOLDER_SCRIPTS = "scripts"
 BRIEFING = "briefing.sqf"
@@ -47,11 +47,21 @@ def _briefing_block(entries: List[BriefingEntry]) -> str:
     return "[\n\t{true}, \n" + ",\n\n".join(items) + "\n\n\n] call FHQ_fnc_ttAddBriefing;\n"
 
 
+def _task_name(task: TaskEntry) -> str:
+    """A plain name, or ["subtask", "parent"] for a subtask (FHQ reads the
+    task's own name from element 0 and the parent's name from element 1)."""
+    if task.parent:
+        return '["%s", "%s"]' % (task.name, task.parent)
+    return '"%s"' % task.name
+
+
 def _task_block(tasks: List[TaskEntry]) -> str:
     items = []
-    for task in tasks:
+    # Parents first: FHQ creates the tasks in array order and looks the parent
+    # up by name, so a child written first would get a nil parent.
+    for task, _depth in ordered_tasks(tasks):
         items.append(
-            '    \t["%s", // Task name\n'
+            '    \t[%s, // Task name\n'
             '\t\t "%s", // Task Description\n'
             '\t\t "%s", // Task title in briefing\n'
             '\t\t "%s", // Waypoint text\n'
@@ -59,7 +69,7 @@ def _task_block(tasks: List[TaskEntry]) -> str:
             '\t\t "%s", // Optional: Task State Status\n'
             '\t\t "%s" // Optional: Task Type\n'
             "        ]"
-            % (task.name, _esc_description(task.description), _esc(task.title),
+            % (_task_name(task), _esc_description(task.description), _esc(task.title),
                _esc(task.waypoint_text), task.marker, task.state, task.task_type))
     return "\n[\n\t{true},\n" + ",\n".join(items) + "\n] call FHQ_fnc_ttAddTasks;\n"
 

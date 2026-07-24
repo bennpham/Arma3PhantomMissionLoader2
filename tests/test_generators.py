@@ -7,7 +7,8 @@ import pytest
 from arma3_phantom_loader import payload
 from arma3_phantom_loader.generators.sqm_markers import parse_marker_names
 from arma3_phantom_loader.model import (BriefingEntry, DebriefEntry,
-                                        MissionConfig, TaskEntry)
+                                        MissionConfig, TaskEntry,
+                                        ordered_tasks)
 from arma3_phantom_loader.pipeline import (MissionFolderError,
                                            check_mission_folder,
                                            generate_mission)
@@ -44,6 +45,9 @@ def base_config(mission_dir) -> MissionConfig:
     config.tasks = [
         TaskEntry(name="task1", title="Clear town", description="Clear it",
                   waypoint_text="Clear", marker="mkr1", state="assigned"),
+        TaskEntry(name="task1a", parent="task1", title="Curly",
+                  description="Eliminate the intelligence officer",
+                  waypoint_text="officers", marker="mkr1", task_type="kill"),
     ]
     return config
 
@@ -58,6 +62,45 @@ def test_validate_catches_problems():
     assert any("debriefing" in p.lower() for p in problems)
     assert any("Duplicate task name" in p for p in problems)
     assert any("assigned" in p for p in problems)
+
+
+def test_validate_catches_parent_problems():
+    config = MissionConfig()
+    config.tasks = [TaskEntry(name="t1", title="A", parent="nope"),
+                    TaskEntry(name="t2", title="B", parent="t2"),
+                    TaskEntry(name="t3", title="C", parent="t4"),
+                    TaskEntry(name="t4", title="D", parent="t3")]
+    problems = config.validate()
+    assert any("unknown parent task 'nope'" in p for p in problems)
+    assert any("Task 't2' cannot be its own parent." == p for p in problems)
+    assert any("Task 't3' is part of a parent/child loop." == p for p in problems)
+    assert any("Task 't4' is part of a parent/child loop." == p for p in problems)
+
+
+def test_validate_accepts_nested_subtasks():
+    config = MissionConfig(mission_dir="somewhere")
+    config.debriefings = [DebriefEntry(classname="Win", title="Won")]
+    config.tasks = [TaskEntry(name="t1", title="A"),
+                    TaskEntry(name="t1a", title="B", parent="t1"),
+                    TaskEntry(name="t1a1", title="C", parent="t1a")]
+    assert config.validate() == []
+
+
+# ------------------------------------------------------------ task ordering
+def test_ordered_tasks_puts_parents_first():
+    child = TaskEntry(name="t1a", parent="t1")
+    grandchild = TaskEntry(name="t1a1", parent="t1a")
+    parent = TaskEntry(name="t1")
+    other = TaskEntry(name="t2")
+    ordered = ordered_tasks([child, grandchild, parent, other])
+    assert [(task.name, depth) for task, depth in ordered] == [
+        ("t1", 0), ("t1a", 1), ("t1a1", 2), ("t2", 0)]
+
+
+def test_ordered_tasks_keeps_every_task_in_a_loop():
+    looped = [TaskEntry(name="t1", parent="t2"), TaskEntry(name="t2", parent="t1")]
+    ordered = ordered_tasks(looped)
+    assert sorted(task.name for task, _ in ordered) == ["t1", "t2"]
 
 
 def test_check_mission_folder_rejects_binarized(tmp_path):
@@ -231,6 +274,26 @@ def test_briefing_and_tasks(mission_dir):
     assert 'getmarkerpos "mkr1"' in briefing
     assert '"assigned", // Optional: Task State Status' in briefing
     assert "] call FHQ_fnc_ttAddTasks;" in briefing
+
+
+def test_subtasks_use_the_array_form_after_their_parent(mission_dir):
+    config = base_config(mission_dir)
+    # Deliberately listed child first: the generator must still write the parent
+    # first, or FHQ_fnc_ttiCreateOrUpdateTask gets a nil parent.
+    config.tasks = [
+        TaskEntry(name="task1a1", parent="task1a", title="Deeper"),
+        TaskEntry(name="task1a", parent="task1", title="Curly"),
+        TaskEntry(name="task1", title="Kill the officers"),
+    ]
+    generate_mission(config)
+
+    briefing = (mission_dir / "scripts" / "briefing.sqf").read_text()
+    assert '["task1", // Task name' in briefing
+    assert '[["task1a", "task1"], // Task name' in briefing
+    assert '[["task1a1", "task1a"], // Task name' in briefing
+    assert (briefing.index('["task1", //')
+            < briefing.index('[["task1a", "task1"]')
+            < briefing.index('[["task1a1", "task1a"]'))
 
 
 def test_debriefing(mission_dir):

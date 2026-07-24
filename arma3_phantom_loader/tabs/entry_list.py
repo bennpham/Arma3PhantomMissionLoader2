@@ -17,6 +17,7 @@ class EntryListTab(QWidget):
                                ValueError with a user-facing message)
       _load_entry(entry)       fill the form from an entry
       _label(entry)            list row text
+      _after_change(entry)     optional: react to a add/update/remove
     """
 
     def __init__(self, parent=None):
@@ -64,6 +65,22 @@ class EntryListTab(QWidget):
     def _label(self, entry) -> str:
         raise NotImplementedError
 
+    def _after_change(self, entry) -> None:
+        """Called once an entry was added, updated or removed. Subclasses that
+        reorder or relabel other rows hook in here; `entry` is None on remove."""
+
+    def _refresh_list(self, select_entry=None) -> None:
+        """Rebuild every row from self.entries, reselecting `select_entry`."""
+        blocked = self.list_widget.blockSignals(True)
+        self.list_widget.clear()
+        row_to_select = -1
+        for row, entry in enumerate(self.entries):
+            self.list_widget.addItem(self._label(entry))
+            if select_entry is not None and entry is select_entry:
+                row_to_select = row
+        self.list_widget.setCurrentRow(row_to_select)
+        self.list_widget.blockSignals(blocked)
+
     # -------------------------------------------------------------- actions
     def _selected_row(self) -> Optional[int]:
         row = self.list_widget.currentRow()
@@ -78,6 +95,7 @@ class EntryListTab(QWidget):
         self.entries.append(entry)
         self.list_widget.addItem(self._label(entry))
         self.list_widget.setCurrentRow(len(self.entries) - 1)
+        self._after_change(entry)
 
     def _update(self) -> None:
         row = self._selected_row()
@@ -90,6 +108,7 @@ class EntryListTab(QWidget):
             return
         self.entries[row] = entry
         self.list_widget.item(row).setText(self._label(entry))
+        self._after_change(entry)
 
     def _remove(self) -> None:
         row = self._selected_row()
@@ -97,6 +116,7 @@ class EntryListTab(QWidget):
             return
         self.entries.pop(row)
         self.list_widget.takeItem(row)
+        self._after_change(None)
 
     def _row_changed(self, row: int) -> None:
         if 0 <= row < len(self.entries):
