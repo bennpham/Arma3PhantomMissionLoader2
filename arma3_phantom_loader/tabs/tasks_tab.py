@@ -1,13 +1,14 @@
 """Tab 6: briefing tasks loaded by FHQ TaskTracker (FHQ_fnc_ttAddTasks)."""
 from __future__ import annotations
 
-from typing import Optional
+from typing import List, Optional
 
 from PySide6.QtWidgets import (QComboBox, QFormLayout, QLabel, QLineEdit,
                                QPlainTextEdit, QVBoxLayout)
 
 from ..model import TASK_STATES, TASK_TYPES, MissionConfig, TaskEntry
 from .entry_list import EntryListTab
+from .marker_combo import make_marker_combo, set_marker_items
 from .markup_helpers import MarkupHelperBox
 
 
@@ -22,7 +23,7 @@ class TasksTab(EntryListTab):
         self.description = QPlainTextEdit()
         self.description.setFixedHeight(80)
         self.waypoint_text = QLineEdit()
-        self.marker = QLineEdit()
+        self.marker = make_marker_combo("Marker name")
         self.state = QComboBox()
         self.state.addItems(TASK_STATES)
         self.task_type = QComboBox()
@@ -35,7 +36,12 @@ class TasksTab(EntryListTab):
         form.addRow("Initial state", self.state)
         form.addRow("Task type", self.task_type)
         layout.addLayout(form)
-        layout.addWidget(MarkupHelperBox(self.description))
+        self.markup = MarkupHelperBox(self.description)
+        layout.addWidget(self.markup)
+
+    def set_markers(self, names: List[str]) -> None:
+        set_marker_items(self.marker, names)
+        self.markup.set_markers(names)
 
     def _make_entry(self, updating_row: Optional[int] = None) -> TaskEntry:
         name = self.name.text().strip()
@@ -45,7 +51,7 @@ class TasksTab(EntryListTab):
             raise ValueError("Task name must not contain any quotes.")
         if not self.title.text().strip():
             raise ValueError("Task Title cannot be blank!")
-        marker = self.marker.text()
+        marker = self.marker.currentText()
         if "'" in marker or '"' in marker:
             raise ValueError("Task Marker Name must not contain any quotes.")
         for row, entry in enumerate(self.entries):
@@ -70,7 +76,7 @@ class TasksTab(EntryListTab):
         self.title.setText(entry.title)
         self.description.setPlainText(entry.description)
         self.waypoint_text.setText(entry.waypoint_text)
-        self.marker.setText(entry.marker)
+        self.marker.setCurrentText(entry.marker)
         self.state.setCurrentText(entry.state)
         self.task_type.setCurrentText(entry.task_type)
 

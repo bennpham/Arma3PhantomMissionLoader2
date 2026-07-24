@@ -4,6 +4,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import (QMainWindow, QMessageBox, QPushButton,
                                QTabWidget, QVBoxLayout, QWidget)
 
+from .generators.sqm_markers import parse_marker_names
 from .model import MissionConfig
 from .pipeline import MissionFolderError, generate_mission
 from .tabs.briefing_tab import BriefingTab
@@ -27,6 +28,8 @@ class MainWindow(QMainWindow):
         self.briefing_tab = BriefingTab()
         self.tasks_tab = TasksTab()
 
+        self.mission_tab.folder_changed.connect(self._refresh_markers)
+
         tabs = QTabWidget()
         tabs.addTab(self.mission_tab, "Mission")
         tabs.addTab(self.description_tab, "Description && Init")
@@ -44,6 +47,11 @@ class MainWindow(QMainWindow):
         layout.addWidget(tabs)
         layout.addWidget(generate_button)
         self.setCentralWidget(central)
+
+    def _refresh_markers(self, mission_dir: str) -> None:
+        names = parse_marker_names(mission_dir) if mission_dir else []
+        self.tasks_tab.set_markers(names)
+        self.briefing_tab.set_markers(names)
 
     def collect_config(self) -> MissionConfig:
         config = MissionConfig()

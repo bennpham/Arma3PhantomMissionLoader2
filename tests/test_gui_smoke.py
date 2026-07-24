@@ -28,7 +28,16 @@ def test_window_generates_mission(app, tmp_path, monkeypatch):
 
     window = MainWindow()
     window.mission_tab.folder_edit.setText(str(mission_dir))
+    window.mission_tab._folder_changed()  # normally fired on editingFinished
     window.mission_tab.author.setText("Smoke Tester")
+
+    # Markers parsed from the fixture mission.sqm populate every marker picker.
+    def combo_items(combo):
+        return [combo.itemText(i) for i in range(combo.count())]
+
+    assert combo_items(window.tasks_tab.marker) == ["objective", "start"]
+    assert combo_items(window.tasks_tab.markup.marker_input) == ["objective", "start"]
+    assert combo_items(window.briefing_tab.markup.marker_input) == ["objective", "start"]
     window.description_tab.infotext.setPlainText("Smoke Run")
     window.scripts_tab.taw_box.setChecked(True)
     window.scripts_tab.weather_box.setChecked(True)

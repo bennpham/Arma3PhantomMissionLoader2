@@ -1,7 +1,7 @@
 """Tab 1: mission folder + everything written into mission.sqm."""
 from __future__ import annotations
 
-from PySide6.QtCore import QDate
+from PySide6.QtCore import QDate, Signal
 from PySide6.QtWidgets import (QCheckBox, QDateEdit, QFileDialog, QFormLayout,
                                QGridLayout, QGroupBox, QHBoxLayout, QLabel,
                                QLineEdit, QPlainTextEdit, QPushButton,
@@ -18,6 +18,10 @@ def _spin(minimum: int, maximum: int, value: int) -> QSpinBox:
 
 
 class MissionTab(QScrollArea):
+    # Emitted with the mission folder path whenever it changes, so the marker
+    # pickers in other tabs can re-parse mission.sqm.
+    folder_changed = Signal(str)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         content = QWidget()
@@ -28,6 +32,7 @@ class MissionTab(QScrollArea):
         folder_layout = QHBoxLayout(folder_box)
         self.folder_edit = QLineEdit()
         self.folder_edit.setPlaceholderText("Path to your mission folder…")
+        self.folder_edit.editingFinished.connect(self._folder_changed)
         browse = QPushButton("Browse…")
         browse.clicked.connect(self._browse)
         folder_layout.addWidget(self.folder_edit)
@@ -144,6 +149,10 @@ class MissionTab(QScrollArea):
         folder = QFileDialog.getExistingDirectory(self, "Select mission folder")
         if folder:
             self.folder_edit.setText(folder)
+            self._folder_changed()
+
+    def _folder_changed(self) -> None:
+        self.folder_changed.emit(self.folder_edit.text().strip())
 
     def apply(self, config: MissionConfig) -> None:
         config.mission_dir = self.folder_edit.text().strip()

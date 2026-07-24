@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from arma3_phantom_loader import payload
+from arma3_phantom_loader.generators.sqm_markers import parse_marker_names
 from arma3_phantom_loader.model import (BriefingEntry, DebriefEntry,
                                         MissionConfig, TaskEntry)
 from arma3_phantom_loader.pipeline import (MissionFolderError,
@@ -252,6 +253,31 @@ def test_infotext(mission_dir):
     assert '["June 24, 2035", "12:00:00"] call BIS_fnc_infoText;' in infotext
     assert '["Operation Test", "By the community"] call BIS_fnc_infoText;' in infotext
     assert '["Created by","Benn"] call BIS_fnc_infoText;' in infotext
+
+
+# ------------------------------------------------------------- marker parser
+def test_parse_marker_names_from_fixture(mission_dir):
+    # The fixture has two markers plus a named non-marker object in a group.
+    assert parse_marker_names(str(mission_dir)) == ["objective", "start"]
+
+
+def test_parse_marker_names_missing_file(tmp_path):
+    assert parse_marker_names(str(tmp_path)) == []
+
+
+def test_parse_marker_names_binarized(tmp_path):
+    (tmp_path / "mission.sqm").write_bytes(b"\0raP\0\0\0\0garbage")
+    assert parse_marker_names(str(tmp_path)) == []
+
+
+def test_parse_marker_names_ignores_unnamed_and_dedupes(tmp_path):
+    (tmp_path / "mission.sqm").write_text(
+        "class Mission\n{\nclass Entities\n{\n"
+        'class Item0\n{\ndataType="Marker";\nname="a";\n};\n'
+        'class Item1\n{\ndataType="Marker";\ntype="mil_dot";\n};\n'  # no name
+        'class Item2\n{\ndataType="Marker";\nname="a";\n};\n'  # dup
+        "};\n};\n")
+    assert parse_marker_names(str(tmp_path)) == ["a"]
 
 
 # ------------------------------------------------------------------ payload

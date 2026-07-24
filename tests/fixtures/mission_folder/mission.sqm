@@ -45,11 +45,36 @@ class Mission
 	};
 	class Entities
 	{
-		items=1;
+		items=3;
 		class Item0
 		{
 			dataType="Group";
 			side="West";
+			class Entities
+			{
+				items=1;
+				class Item0
+				{
+					dataType="Object";
+					name="leader1";
+				};
+			};
+		};
+		class Item1
+		{
+			dataType="Marker";
+			position[]={1000,5,2000};
+			name="start";
+			type="mil_start";
+			colorName="ColorBlue";
+		};
+		class Item2
+		{
+			dataType="Marker";
+			position[]={3000,5,4000};
+			name="objective";
+			type="mil_objective";
+			colorName="ColorRed";
 		};
 	};
 };

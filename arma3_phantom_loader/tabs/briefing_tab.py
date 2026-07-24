@@ -1,7 +1,7 @@
 """Tab 5: briefing entries loaded by FHQ TaskTracker (FHQ_fnc_ttAddBriefing)."""
 from __future__ import annotations
 
-from typing import Optional
+from typing import List, Optional
 
 from PySide6.QtWidgets import (QFormLayout, QLabel, QLineEdit, QPlainTextEdit,
                                QVBoxLayout)
@@ -21,7 +21,11 @@ class BriefingTab(EntryListTab):
         form.addRow("Title", self.title)
         form.addRow("Description", self.description)
         layout.addLayout(form)
-        layout.addWidget(MarkupHelperBox(self.description))
+        self.markup = MarkupHelperBox(self.description)
+        layout.addWidget(self.markup)
+
+    def set_markers(self, names: List[str]) -> None:
+        self.markup.set_markers(names)
 
     def _make_entry(self, updating_row: Optional[int] = None) -> BriefingEntry:
         if not self.title.text().strip():
