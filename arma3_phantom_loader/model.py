@@ -8,12 +8,33 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List
 
-TASK_STATES = ["created", "assigned", "succeeded", "failed", "cancelled"]
-TASK_TYPES = [
-    "", "attack", "defend", "destroy", "move", "getin", "getout",
-    "search", "talk", "target", "meet", "navigate", "repair",
-    "rearm", "refuel", "heal", "takeoff", "land", "scout",
+TASK_STATES = ["created", "assigned", "succeeded", "failed", "canceled"]
+# Source of truth for Task Types: https://community.bistudio.com/wiki/Arma_3:_Task_Framework#Task_Icons
+# Grouped exactly as the wiki groups them (Actions, Objects, Letters), each
+# alphabetical. "" means "leave the task type unset".
+TASK_TYPE_ACTIONS = [
+    "airdrop", "attack", "danger", "default", "defend", "destroy", "download",
+    "exit", "getin", "getout", "heal", "interact", "kill", "land", "listen",
+    "meet", "move", "move1", "move2", "move3", "move4", "move5", "navigate",
+    "rearm", "refuel", "repair", "run", "scout", "search", "takeoff", "talk",
+    "talk1", "talk2", "talk3", "talk4", "talk5", "target", "unknown", "upload",
+    "use", "wait", "walk",
 ]
+TASK_TYPE_OBJECTS = [
+    "armor", "backpack", "boat", "box", "car", "container", "documents",
+    "heli", "intel", "map", "mine", "plane", "radio", "rifle", "truck",
+    "whiteboard",
+]
+# Full set of capital letter icons, named simply "a" .. "z".
+TASK_TYPE_LETTERS = [chr(code) for code in range(ord("a"), ord("z") + 1)]
+
+# (group label, types) in the order they are offered in the UI.
+TASK_TYPE_GROUPS = [
+    ("Actions", TASK_TYPE_ACTIONS),
+    ("Objects", TASK_TYPE_OBJECTS),
+    ("Letters", TASK_TYPE_LETTERS),
+]
+TASK_TYPES = [""] + [t for _, types in TASK_TYPE_GROUPS for t in types]
 
 
 @dataclass

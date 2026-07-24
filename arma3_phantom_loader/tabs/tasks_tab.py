@@ -6,10 +6,20 @@ from typing import List, Optional
 from PySide6.QtWidgets import (QComboBox, QFormLayout, QLabel, QLineEdit,
                                QPlainTextEdit, QVBoxLayout)
 
-from ..model import TASK_STATES, TASK_TYPES, MissionConfig, TaskEntry
+from ..model import TASK_STATES, TASK_TYPE_GROUPS, MissionConfig, TaskEntry
 from .entry_list import EntryListTab
 from .marker_combo import make_marker_combo, set_marker_items
 from .markup_helpers import MarkupHelperBox
+
+
+def _fill_task_types(combo: QComboBox) -> None:
+    """List the task types under non-selectable Actions/Objects/Letters headings."""
+    combo.addItem("")
+    for label, types in TASK_TYPE_GROUPS:
+        combo.insertSeparator(combo.count())
+        combo.addItem(label)
+        combo.model().item(combo.count() - 1).setEnabled(False)
+        combo.addItems(types)
 
 
 class TasksTab(EntryListTab):
@@ -27,7 +37,7 @@ class TasksTab(EntryListTab):
         self.state = QComboBox()
         self.state.addItems(TASK_STATES)
         self.task_type = QComboBox()
-        self.task_type.addItems(TASK_TYPES)
+        _fill_task_types(self.task_type)
         form.addRow("Task name", self.name)
         form.addRow("Task title", self.title)
         form.addRow("Description", self.description)

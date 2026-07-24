@@ -36,7 +36,7 @@ To set a task as success, cancel, or fail:
 
 ```
 ["task1", "succeeded"] call FHQ_fnc_ttSetTaskState;
-["task1", "cancelled"] call FHQ_fnc_ttSetTaskState;
+["task1", "canceled"] call FHQ_fnc_ttSetTaskState;
 ["task1", "failed"] call FHQ_fnc_ttSetTaskState;
 ```
 
