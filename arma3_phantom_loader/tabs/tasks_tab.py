@@ -6,7 +6,8 @@ from typing import List, Optional
 from PySide6.QtWidgets import (QComboBox, QFormLayout, QLabel, QLineEdit,
                                QPlainTextEdit, QVBoxLayout)
 
-from ..model import TASK_STATES, TASK_TYPE_GROUPS, MissionConfig, TaskEntry
+from ..model import (TASK_STATES, TASK_TYPE_GROUPS, MissionConfig, TaskEntry,
+                     ordered_tasks)
 from .entry_list import EntryListTab
 from .marker_combo import make_marker_combo, set_marker_items
 from .markup_helpers import MarkupHelperBox
@@ -22,13 +23,22 @@ def _fill_task_types(combo: QComboBox) -> None:
         combo.addItems(types)
 
 
+NO_PARENT = ""
+
+
 class TasksTab(EntryListTab):
     def _build_form(self, layout: QVBoxLayout) -> None:
         layout.addWidget(QLabel(
             "Task names must be unique (task1, task2, … taskN recommended).\n"
-            "Only one task may start in the 'assigned' state."))
+            "Only one task may start in the 'assigned' state.\n"
+            "Pick a parent task to make this task a subtask of it."))
+        # Nesting depth per entry, refreshed whenever the list changes.
+        self._depths = {}
         form = QFormLayout()
         self.name = QLineEdit()
+        self.parent_task = QComboBox()
+        # Which tasks may be picked depends on the name being edited.
+        self.name.textChanged.connect(lambda _text: self._refresh_parent_combo())
         self.title = QLineEdit()
         self.description = QPlainTextEdit()
         self.description.setFixedHeight(80)
@@ -39,6 +49,7 @@ class TasksTab(EntryListTab):
         self.task_type = QComboBox()
         _fill_task_types(self.task_type)
         form.addRow("Task name", self.name)
+        form.addRow("Parent task (optional)", self.parent_task)
         form.addRow("Task title", self.title)
         form.addRow("Description", self.description)
         form.addRow("Waypoint text", self.waypoint_text)
@@ -48,10 +59,42 @@ class TasksTab(EntryListTab):
         layout.addLayout(form)
         self.markup = MarkupHelperBox(self.description)
         layout.addWidget(self.markup)
+        self._refresh_parent_combo()
 
     def set_markers(self, names: List[str]) -> None:
         set_marker_items(self.marker, names)
         self.markup.set_markers(names)
+
+    # ------------------------------------------------------------ parenting
+    def _descendants(self, name: str) -> set:
+        """Names of every task below `name`, so they can't become its parent."""
+        found = set()
+        pending = [name]
+        while pending:
+            current = pending.pop()
+            for entry in self.entries:
+                if entry.parent == current and entry.name not in found:
+                    found.add(entry.name)
+                    pending.append(entry.name)
+        return found
+
+    def _refresh_parent_combo(self) -> None:
+        """List every task the one being edited could legally be a subtask of.
+
+        A task can never be its own parent, nor a subtask of one of its own
+        subtasks, so the name in the form plus its descendants are left out.
+        """
+        editing = self.name.text().strip()
+        forbidden = {editing} | self._descendants(editing) if editing else set()
+        current = self.parent_task.currentText()
+        names = [entry.name for entry in self.entries
+                 if entry.name and entry.name not in forbidden]
+        blocked = self.parent_task.blockSignals(True)
+        self.parent_task.clear()
+        self.parent_task.addItem(NO_PARENT)
+        self.parent_task.addItems(names)
+        self.parent_task.setCurrentText(current if current in names else NO_PARENT)
+        self.parent_task.blockSignals(blocked)
 
     def _make_entry(self, updating_row: Optional[int] = None) -> TaskEntry:
         name = self.name.text().strip()
@@ -71,8 +114,17 @@ class TasksTab(EntryListTab):
             for row, entry in enumerate(self.entries):
                 if row != updating_row and entry.state == "assigned":
                     raise ValueError("Only 1 task state can start off as Assigned!")
+        parent = self.parent_task.currentText()
+        if parent:
+            if parent == name:
+                raise ValueError("A task cannot be its own parent.")
+            if not any(entry.name == parent for entry in self.entries):
+                raise ValueError(f"Parent task {parent} does not exist!")
+            if parent in self._descendants(name):
+                raise ValueError(f"{parent} is already a subtask of {name}.")
         return TaskEntry(
             name=name,
+            parent=parent,
             title=self.title.text(),
             description=self.description.toPlainText(),
             waypoint_text=self.waypoint_text.text(),
@@ -83,6 +135,8 @@ class TasksTab(EntryListTab):
 
     def _load_entry(self, entry: TaskEntry) -> None:
         self.name.setText(entry.name)
+        self._refresh_parent_combo()
+        self.parent_task.setCurrentText(entry.parent)
         self.title.setText(entry.title)
         self.description.setPlainText(entry.description)
         self.waypoint_text.setText(entry.waypoint_text)
@@ -91,7 +145,47 @@ class TasksTab(EntryListTab):
         self.task_type.setCurrentText(entry.task_type)
 
     def _label(self, entry: TaskEntry) -> str:
-        return f"{entry.name} — {entry.title}"
+        depth = self._depths.get(id(entry), 0)
+        indent = "    " * depth + ("↳ " if depth else "")
+        return f"{indent}{entry.name} — {entry.title}"
+
+    # ---------------------------------------------------------------- hooks
+    def _after_change(self, entry: Optional[TaskEntry]) -> None:
+        """Re-sort so every subtask sits under its parent, indented."""
+        ordered = ordered_tasks(self.entries)
+        self.entries = [task for task, _depth in ordered]
+        self._depths = {id(task): depth for task, depth in ordered}
+        self._refresh_list(select_entry=entry)
+        self._refresh_parent_combo()
+
+    def _update(self) -> None:
+        row = self._selected_row()
+        if row is None:
+            return
+        old_name = self.entries[row].name
+        before = {id(task) for task in self.entries}
+        super()._update()
+        # _after_change may have re-sorted; the updated entry is the new object.
+        updated = next((task for task in self.entries if id(task) not in before), None)
+        if updated is None or updated.name == old_name:
+            return
+        renamed = False
+        for task in self.entries:  # keep the subtasks pointing at their parent
+            if task.parent == old_name:
+                task.parent = updated.name
+                renamed = True
+        if renamed:
+            self._after_change(updated)
+
+    def _remove(self) -> None:
+        row = self._selected_row()
+        if row is None:
+            return
+        removed = self.entries[row].name
+        for task in self.entries:  # promote the orphans to top level tasks
+            if task.parent == removed:
+                task.parent = ""
+        super()._remove()
 
     def apply(self, config: MissionConfig) -> None:
         config.tasks = list(self.entries)

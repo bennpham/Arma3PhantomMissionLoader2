@@ -6,7 +6,7 @@ arma3_phantom_loader.generators so the pipeline is testable without Qt.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Tuple
 
 TASK_STATES = ["created", "assigned", "succeeded", "failed", "canceled"]
 # Source of truth for Task Types: https://community.bistudio.com/wiki/Arma_3:_Task_Framework#Task_Icons
@@ -129,12 +129,52 @@ class BriefingEntry:
 @dataclass
 class TaskEntry:
     name: str = ""
+    # Name of the task this one is a subtask of ("" for a top level task).
+    parent: str = ""
     description: str = ""
     title: str = ""
     waypoint_text: str = ""
     marker: str = ""
     state: str = "created"
     task_type: str = ""
+
+
+def ordered_tasks(tasks: List[TaskEntry]) -> List[Tuple[TaskEntry, int]]:
+    """Return (task, depth) pairs, every parent placed before its children.
+
+    FHQ_fnc_ttAddTasks creates the tasks in array order and resolves a subtask's
+    parent by name (fn_ttiCreateOrUpdateTask), so a child written before its
+    parent would be handed a nil parent. Tasks whose parent is empty or unknown
+    count as top level; anything left over (a parent loop) is appended at the
+    end so no task is ever dropped.
+    """
+    children: dict = {}
+    roots: List[TaskEntry] = []
+    names = {task.name for task in tasks}
+    for task in tasks:
+        if task.parent and task.parent != task.name and task.parent in names:
+            children.setdefault(task.parent, []).append(task)
+        else:
+            roots.append(task)
+
+    ordered: List[Tuple[TaskEntry, int]] = []
+    seen = set()
+
+    def walk(task: TaskEntry, depth: int) -> None:
+        if id(task) in seen:
+            return
+        seen.add(id(task))
+        ordered.append((task, depth))
+        for child in children.get(task.name, []):
+            walk(child, depth + 1)
+
+    for task in roots:
+        walk(task, 0)
+    for task in tasks:  # tasks caught in a loop
+        if id(task) not in seen:
+            seen.add(id(task))
+            ordered.append((task, 0))
+    return ordered
 
 
 @dataclass
@@ -147,6 +187,28 @@ class MissionConfig:
     debriefings: List[DebriefEntry] = field(default_factory=list)
     briefings: List[BriefingEntry] = field(default_factory=list)
     tasks: List[TaskEntry] = field(default_factory=list)
+
+    def _looping_tasks(self) -> List[str]:
+        """Names of tasks whose parent chain leads back to themselves.
+
+        A self-parent is reported separately, so it is skipped here.
+        """
+        by_name = {task.name: task for task in self.tasks}
+        looping = []
+        for task in self.tasks:
+            if not task.parent or task.parent == task.name:
+                continue
+            walked = {task.name}
+            current = by_name.get(task.parent)
+            while current is not None:
+                if current.name == task.name:
+                    looping.append(task.name)
+                    break
+                if current.name in walked:
+                    break
+                walked.add(current.name)
+                current = by_name.get(current.parent) if current.parent else None
+        return looping
 
     def validate(self) -> List[str]:
         """Return a list of validation problems (empty when good to generate)."""
@@ -167,6 +229,7 @@ class MissionConfig:
             seen.add(name.lower())
         seen = set()
         assigned = 0
+        task_names = {task.name for task in self.tasks}
         for task in self.tasks:
             name = task.name.strip()
             if not name:
@@ -180,10 +243,18 @@ class MissionConfig:
                 problems.append(f"Task '{name}' has an empty title.")
             if "'" in task.marker or '"' in task.marker:
                 problems.append(f"Task '{name}' marker must not contain quotes.")
+            if task.parent:
+                if task.parent == task.name:
+                    problems.append(f"Task '{name}' cannot be its own parent.")
+                elif task.parent not in task_names:
+                    problems.append(
+                        f"Task '{name}' has an unknown parent task '{task.parent}'.")
             if task.state == "assigned":
                 assigned += 1
         if assigned > 1:
             problems.append("Only one task may start in the 'assigned' state.")
+        for task in self._looping_tasks():
+            problems.append(f"Task '{task}' is part of a parent/child loop.")
         for entry in self.briefings:
             if not entry.title.strip():
                 problems.append("A briefing entry has an empty title.")

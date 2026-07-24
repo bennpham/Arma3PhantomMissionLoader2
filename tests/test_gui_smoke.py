@@ -56,6 +56,11 @@ def test_window_generates_mission(app, tmp_path, monkeypatch):
     window.tasks_tab.name.setText("task1")
     window.tasks_tab.title.setText("Clear town")
     window.tasks_tab._add()
+    window.tasks_tab.name.setText("task1a")
+    window.tasks_tab.title.setText("Curly")
+    window.tasks_tab.parent_task.setCurrentText("task1")
+    window.tasks_tab._add()
+    assert [t.parent for t in window.tasks_tab.entries] == ["", "task1"]
 
     # Swallow the result dialogs
     infos, errors = [], []
@@ -73,6 +78,43 @@ def test_window_generates_mission(app, tmp_path, monkeypatch):
     assert (mission_dir / "functions" / "taw_vd").is_dir()
     assert (mission_dir / "functions" / "weatherEffects.fsm").is_file()
     assert (mission_dir / "mission.sqm.old").is_file()
+
+
+def test_subtasks_are_nested_and_orphans_promoted(app, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    from arma3_phantom_loader.tabs.tasks_tab import TasksTab
+
+    errors = []
+    monkeypatch.setattr(QMessageBox, "critical",
+                        lambda *a, **k: errors.append(a))
+
+    tab = TasksTab()
+    for name, title, parent in (("task2", "Exfil", ""),
+                                ("task1", "Kill the officers", ""),
+                                ("task1a", "Curly", "task1")):
+        tab.name.setText(name)
+        tab.title.setText(title)
+        tab.parent_task.setCurrentText(parent)
+        tab._add()
+    assert not errors
+
+    # The subtask is sorted under its parent and indented in the list.
+    assert [t.name for t in tab.entries] == ["task2", "task1", "task1a"]
+    rows = [tab.list_widget.item(i).text() for i in range(tab.list_widget.count())]
+    assert rows[1] == "task1 — Kill the officers"
+    assert rows[2] == "    ↳ task1a — Curly"
+
+    # A task cannot be offered itself (or its own descendants) as a parent.
+    tab.list_widget.setCurrentRow(1)
+    offered = [tab.parent_task.itemText(i) for i in range(tab.parent_task.count())]
+    assert offered == ["", "task2"]
+
+    # Removing the parent promotes the subtask to a top level task.
+    tab._remove()
+    assert [(t.name, t.parent) for t in tab.entries] == [("task2", ""),
+                                                         ("task1a", "")]
+    assert tab.list_widget.item(1).text() == "task1a — Curly"
 
 
 def test_duplicate_debriefing_rejected(app, monkeypatch):

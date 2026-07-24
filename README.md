@@ -57,7 +57,9 @@ On Linux you may need Qt's runtime libraries, e.g. on Debian/Ubuntu:
 2. Start the loader and select the mission folder on the **Mission** tab.
 3. Work through the tabs — Mission settings, Description & Init, Scripts,
    Debriefing (add at least one entry, e.g. the Win/Lose presets),
-   Briefing, and Tasks.
+   Briefing, and Tasks. On the Tasks tab, pick a **parent task** to turn an
+   entry into a subtask — it is shown indented under its parent and written
+   to `briefing.sqf` as `["subtask", "parent"]`, after its parent.
 4. Click **Generate Mission Files**. Anything that needs manual follow-up
    (ACE gear, player-count scaling, loadouts…) is listed in
    [SETUP.md](SETUP.md).
