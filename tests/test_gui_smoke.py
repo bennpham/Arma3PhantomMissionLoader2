@@ -80,6 +80,50 @@ def test_window_generates_mission(app, tmp_path, monkeypatch):
     assert (mission_dir / "mission.sqm.old").is_file()
 
 
+def test_load_intel_populates_mission_tab(app, tmp_path):
+    from arma3_phantom_loader.tabs.mission_tab import MissionTab
+
+    # Fixture Intel: year=2035 month=7 day=6 hour=8 minute=42,
+    # timeOfChanges=1800.0002, startWeather=0.25.
+    tab = MissionTab()
+    tab.load_intel(str(FIXTURE))
+
+    assert (tab.date.date().year(), tab.date.date().month(),
+            tab.date.date().day()) == (2035, 7, 6)
+    assert tab.hour.value() == 8
+    assert tab.minute.value() == 42
+    assert tab.overcast_start.value() == 25
+    assert (tab.toc_hours.value(), tab.toc_minutes.value(),
+            tab.toc_seconds.value()) == (0, 30, 0)
+
+
+def test_load_intel_normalizes_negative_minute(app, tmp_path):
+    from arma3_phantom_loader.tabs.mission_tab import MissionTab
+
+    block = (
+        "class Mission\n{\n\tclass Intel\n\t{\n"
+        "\t\tresistanceWest=0;\n\t\tresistanceEast=1;\n"
+        "\t\tstartWeather=0.10484093;\n\t\tstartFog=0.011985922;\n"
+        "\t\thour=18;\n\t\tminute=-30;\n"
+        "\t\tstartFogBase=1;\n\t\tstartFogDecay=0.014;\n"
+        "\t};\n};\n"
+    )
+    (tmp_path / "mission.sqm").write_text(block, encoding="utf-8")
+
+    tab = MissionTab()
+    tab.load_intel(str(tmp_path))
+
+    # hour=18 minute=-30 normalizes to 17:30 in-game.
+    assert tab.hour.value() == 17
+    assert tab.minute.value() == 30
+    assert tab.resistance_west.isChecked() is False
+    assert tab.resistance_east.isChecked() is True
+    assert tab.overcast_start.value() == 10       # round(0.10484093 * 100)
+    assert tab.fog_start.value() == 1             # round(0.011985922 * 100)
+    assert tab.fog_start_base.value() == 1
+    assert tab.fog_start_decay.value() == 1       # round(0.014 * 100)
+
+
 def test_subtasks_are_nested_and_orphans_promoted(app, monkeypatch):
     from PySide6.QtWidgets import QMessageBox
 

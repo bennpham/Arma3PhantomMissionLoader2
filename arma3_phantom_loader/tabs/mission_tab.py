@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (QCheckBox, QDateEdit, QFileDialog, QFormLayout,
                                QLineEdit, QPlainTextEdit, QPushButton,
                                QScrollArea, QSpinBox, QVBoxLayout, QWidget)
 
+from ..generators.sqm_intel import parse_intel
 from ..model import MissionConfig
 
 
@@ -154,6 +155,62 @@ class MissionTab(QScrollArea):
 
     def _folder_changed(self) -> None:
         self.folder_changed.emit(self.folder_edit.text().strip())
+
+    def load_intel(self, mission_dir: str) -> None:
+        """Populate the date/time and Intel widgets from a mission's `class Intel`.
+
+        Only fields present in the file are applied; anything absent keeps the
+        widget's current value. Conversions are the inverse of sqm_editor:
+        percent floats (0..1) become 0-100 spin values, and a negative `minute`
+        (Arma allows it, e.g. hour=18 minute=-30 = 17:30) is normalized into a
+        valid clock time.
+        """
+        if not mission_dir:
+            return
+        intel = parse_intel(mission_dir)
+
+        if intel.year is not None and intel.month is not None and intel.day is not None:
+            date = QDate(intel.year, intel.month, intel.day)
+            if date.isValid():
+                self.date.setDate(date)
+
+        if intel.hour is not None or intel.minute is not None:
+            hour = intel.hour if intel.hour is not None else self.hour.value()
+            minute = intel.minute if intel.minute is not None else self.minute.value()
+            total = (hour * 60 + minute) % 1440  # normalize (handles negatives)
+            self.hour.setValue(total // 60)
+            self.minute.setValue(total % 60)
+
+        if intel.resistance_west is not None:
+            self.resistance_west.setChecked(intel.resistance_west)
+        if intel.resistance_east is not None:
+            self.resistance_east.setChecked(intel.resistance_east)
+
+        if intel.time_of_changes is not None:
+            total = round(intel.time_of_changes)
+            self.toc_hours.setValue(total // 3600)
+            self.toc_minutes.setValue((total % 3600) // 60)
+            self.toc_seconds.setValue(total % 60)
+
+        # weather / fog: sqm 0..1 -> UI 0-100 (inverse of sqm_editor._pct)
+        for value, widget in (
+            (intel.start_weather, self.overcast_start),
+            (intel.forecast_weather, self.overcast_forecast),
+            (intel.start_fog, self.fog_start),
+            (intel.forecast_fog, self.fog_forecast),
+            (intel.start_fog_decay, self.fog_start_decay),
+            (intel.forecast_fog_decay, self.fog_forecast_decay),
+        ):
+            if value is not None:
+                widget.setValue(round(value * 100))
+
+        # fog base: raw metres
+        for value, widget in (
+            (intel.start_fog_base, self.fog_start_base),
+            (intel.forecast_fog_base, self.fog_forecast_base),
+        ):
+            if value is not None:
+                widget.setValue(round(value))
 
     def apply(self, config: MissionConfig) -> None:
         config.mission_dir = self.folder_edit.text().strip()
