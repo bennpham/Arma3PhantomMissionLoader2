@@ -52,6 +52,7 @@ class MainWindow(QMainWindow):
         names = parse_marker_names(mission_dir) if mission_dir else []
         self.tasks_tab.set_markers(names)
         self.briefing_tab.set_markers(names)
+        self.mission_tab.load_intel(mission_dir)
 
     def collect_config(self) -> MissionConfig:
         config = MissionConfig()
