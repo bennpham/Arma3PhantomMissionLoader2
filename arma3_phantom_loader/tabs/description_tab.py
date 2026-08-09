@@ -25,6 +25,14 @@ class DescriptionTab(QWidget):
         params_layout.addWidget(self.description_loadout)
         layout.addWidget(params_box)
 
+        main_box = QGroupBox("Main")
+        main_layout = QVBoxLayout(main_box)
+        self.use_main_sqf = QCheckBox(
+            "Use main.sqf — move the server-side setup into "
+            "functions\\pht6\\main.sqf (PHT6_fnc_main), for randomization")
+        main_layout.addWidget(self.use_main_sqf)
+        layout.addWidget(main_box)
+
         init_box = QGroupBox("init.sqf extras")
         init_layout = QVBoxLayout(init_box)
         self.init_ace = QCheckBox(
@@ -55,4 +63,5 @@ class DescriptionTab(QWidget):
         desc.description_loadout = self.description_loadout.isChecked()
         desc.init_ace = self.init_ace.isChecked()
         desc.init_zeus = self.init_zeus.isChecked()
+        desc.use_main_sqf = self.use_main_sqf.isChecked()
         desc.infotext = self.infotext.toPlainText()

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List
 
 from ..model import MissionConfig
+from . import sqf_blocks
 
 INIT = "init.sqf"
 
@@ -46,6 +47,11 @@ def write_init_sqf(mission_dir: str, config: MissionConfig) -> Path:
         'call compile preProcessFileLineNumbers "scripts\\briefing.sqf";',
     ]
 
+    if desc.use_main_sqf:
+        # The server-side setup lives in functions\pht6\main.sqf instead.
+        lines.append("")
+        lines.append("[] spawn PHT6_fnc_main;")
+
     if config.taw_vd.enabled:
         lines.append("")
         lines.append("// TAW View Distance settings")
@@ -54,63 +60,13 @@ def write_init_sqf(mission_dir: str, config: MissionConfig) -> Path:
         if config.taw_vd.enable_max_range:
             lines.append(f"tawvd_maxRange = {config.taw_vd.max_range};")
 
-    if desc.init_ace:
-        lines += [
-            "",
-            "// Adds extra ace equipments to player's uniforms or vests.",
-            '//\tExample 1: ammobox1 addItemCargoGlobal ["ACE_bloodIV", 2];',
-            '//\tExample 2: uniformContainer p1 addMagazineCargoGlobal ["ACE_M84", 6];',
-            'if (isServer && isClass (configFile >> "CfgMods" >> "ace")) then {',
-            "\t{",
-            '\t\tvestContainer _x addItemCargoGlobal ["ACE_EarPlugs", 1];',
-            "",
-            "\t\t// Give medics medical supplies",
-            '\t\tif (_x getUnitTrait "medic" == true) then {',
-            '\t\t\tbackpackContainer _x addItemCargoGlobal ["ACE_bloodIV", 3];',
-            '\t\t\tbackpackContainer _x addItemCargoGlobal ["ACE_salineIV", 3];',
-            '\t\t\tbackpackContainer _x addItemCargoGlobal ["ACE_bloodIV_500", 2];',
-            '\t\t\tbackpackContainer _x addItemCargoGlobal ["ACE_salineIV_500", 2];',
-            '\t\t\tbackpackContainer _x addItemCargoGlobal ["ACE_bloodIV_250", 3];',
-            '\t\t\tbackpackContainer _x addItemCargoGlobal ["ACE_salineIV_250", 3];',
-            '\t\t\tbackpackContainer _x addItemCargoGlobal ["ACE_epinephrine", 6];',
-            '\t\t\tbackpackContainer _x addItemCargoGlobal ["ACE_morphine", 8];',
-            '\t\t\tbackpackContainer _x addItemCargoGlobal ["ACE_tourniquet", 4];',
-            '\t\t\tbackpackContainer _x addItemCargoGlobal ["ACE_splint", 6];',
-            "\t\t};",
-            "",
-            "\t\t// TODO",
-            "\t} forEach FHQ_playableUnits;",
-            "};",
-        ]
-    if desc.params_scale_players:
-        lines += [
-            "",
-            "// Singleplayer handling",
-            "if (!isMultiplayer) then {",
-            "\t// TODO",
-            "};",
-            "",
-            "// Scaled Multiplayer handling for small player count",
-            '_ScalePlayers = "ScalePlayers" call BIS_fnc_getParamValue;',
-            "if (_ScalePlayers == 1 && isServer && isMultiplayer) then {",
-            "\t// TODO",
-            "};",
-            "",
-            "// Fullhouse Multiplayer Handling",
-            "if (_ScalePlayers == 0 && isServer && isMultiplayer) then {",
-            "\t// TODO",
-            "};",
-        ]
-    if desc.init_zeus:
-        lines += [
-            "",
-            "// Initialize stuff for Zeus on server",
-            "if (isMultiplayer && isServer) then {",
-            "\t{zeus_mod1 addCuratorEditableObjects [[_x],true]} forEach allUnits;",
-            "\t{zeus_mod2 addCuratorEditableObjects [[_x],true]} forEach allUnits;",
-            "\t{zeus_mod3 addCuratorEditableObjects [[_x],true]} forEach allUnits;",
-            "};",
-        ]
+    if not desc.use_main_sqf:
+        if desc.init_ace:
+            lines += [""] + sqf_blocks.ace_block()
+        if desc.params_scale_players:
+            lines += [""] + sqf_blocks.scale_players_block()
+        if desc.init_zeus:
+            lines += [""] + sqf_blocks.zeus_block()
     lines.append("")
     if config.weather.enabled:
         lines.append('call compile preProcessFileLineNumbers "scripts\\weatherScript.sqf";')

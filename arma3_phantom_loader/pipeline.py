@@ -8,7 +8,8 @@ from typing import List
 from . import payload
 from .model import MissionConfig
 from .generators import (briefing_gen, debriefing_gen, description_ext,
-                         functions_payload, init_sqf, scripts_gen, sqm_editor)
+                         functions_payload, init_sqf, main_sqf, scripts_gen,
+                         sqm_editor)
 
 FOLDER_IMAGES = "images"
 
@@ -52,6 +53,9 @@ def generate_mission(config: MissionConfig) -> List[str]:
     # 3. functions payload + common.hpp
     written += functions_payload.install_functions(
         mission_dir, config, payload.functions_root())
+    maybe_main = main_sqf.write_main_sqf(mission_dir, config)
+    if maybe_main:
+        written.append(maybe_main)
 
     # 4. scripts folder
     written.append(scripts_gen.write_infotext(mission_dir, config))
