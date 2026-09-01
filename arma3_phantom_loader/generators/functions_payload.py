@@ -33,6 +33,14 @@ COMMON_HPP_MACROS = '''#define INTERNAL_FUNCTION(x)\t\t\t\t\\
 \t};
 '''
 
+PHT6_CLASS = '''class PHT6
+{
+\tclass phantomsix_insurgentFunctions {
+\t\tclass main {file = "functions\\pht6\\main.sqf";};
+\t};
+};
+'''
+
 
 def install_functions(mission_dir: str, config: MissionConfig,
                       payload_functions: Path) -> List[Path]:
@@ -72,4 +80,6 @@ def build_common_hpp(config: MissionConfig) -> str:
     parts.append('\t#include "fhq_misc.hpp"')
     parts.append('\t#include "fhq_tasktracker.hpp"')
     parts.append("};\n")
+    if config.description.use_main_sqf:
+        parts.append(PHT6_CLASS)
     return "\n".join(parts)

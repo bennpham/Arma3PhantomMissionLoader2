@@ -87,6 +87,7 @@ class DescriptionSettings:
     description_loadout: bool = False
     init_ace: bool = False
     init_zeus: bool = False
+    use_main_sqf: bool = False
     infotext: str = ""
 
 

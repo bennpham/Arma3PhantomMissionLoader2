@@ -234,6 +234,9 @@ def test_description_and_init_defaults(mission_dir):
     assert "weatherScript" not in init
     assert "CfgMods" not in init
     assert "zeus_mod1" not in init
+    assert "PHT6_fnc_main" not in init
+    assert not (mission_dir / "functions" / "pht6").exists()
+    assert "PHT6" not in (mission_dir / "functions" / "common.hpp").read_text()
 
 
 def test_description_and_init_all_options(mission_dir):
@@ -258,6 +261,52 @@ def test_description_and_init_all_options(mission_dir):
     assert '"ScalePlayers" call BIS_fnc_getParamValue' in init
     assert 'isClass (configFile >> "CfgMods" >> "ace")' in init
     assert "zeus_mod1 addCuratorEditableObjects" in init
+
+
+def test_use_main_sqf_moves_the_server_blocks(mission_dir):
+    config = base_config(mission_dir)
+    config.description.params_scale_players = True
+    config.description.init_ace = True
+    config.description.init_zeus = True
+    config.description.use_main_sqf = True
+    config.taw_vd.enabled = True
+    config.taw_vd.disable_none = True
+    generate_mission(config)
+
+    init = (mission_dir / "init.sqf").read_text()
+    assert "[] spawn PHT6_fnc_main;" in init
+    assert "CfgMods" not in init
+    assert "zeus_mod1" not in init
+    assert '"ScalePlayers" call BIS_fnc_getParamValue' not in init
+    # client-side lines stay behind
+    assert "tawvd_disablenone = true;" in init
+    assert 'call compile preProcessFileLineNumbers "scripts\\briefing.sqf";' in init
+    assert 'call compile preProcessFileLineNumbers "scripts\\infotext.sqf";' in init
+
+    main = (mission_dir / "functions" / "pht6" / "main.sqf").read_text()
+    assert "if (isServer) then {" in main
+    assert "waitUntil { time > 0 };" in main
+    assert 'isClass (configFile >> "CfgMods" >> "ace")' in main
+    assert '"ScalePlayers" call BIS_fnc_getParamValue' in main
+    assert "zeus_mod1 addCuratorEditableObjects" in main
+    assert main.rstrip().endswith("};")
+
+    common = (mission_dir / "functions" / "common.hpp").read_text()
+    assert 'class main {file = "functions\\pht6\\main.sqf";};' in common
+    assert common.index("class FHQ") < common.index("class PHT6")
+
+
+def test_use_main_sqf_never_overwrites_an_existing_main(mission_dir):
+    config = base_config(mission_dir)
+    config.description.use_main_sqf = True
+    pht6 = mission_dir / "functions" / "pht6"
+    pht6.mkdir(parents=True)
+    (pht6 / "main.sqf").write_text("// hand written\n", encoding="utf-8")
+
+    written = generate_mission(config)
+
+    assert (pht6 / "main.sqf").read_text() == "// hand written\n"
+    assert not any("main.sqf" in path for path in written)
 
 
 # -------------------------------------------------------- briefing/debriefing
